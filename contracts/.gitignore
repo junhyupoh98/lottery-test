@@ -1,0 +1,14 @@
+# Compiler files
+cache/
+out/
+
+# Ignores development broadcast logs
+!/broadcast
+/broadcast/*/31337/
+/broadcast/**/dry-run/
+
+# Docs
+docs/
+
+# Dotenv file
+# .env  (커멘트 처리: Git에 안 올릴 거라 ignore 해제)

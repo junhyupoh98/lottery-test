@@ -1,0 +1,19 @@
+# Build outputs
+out/
+cache/
+broadcast/
+node_modules/
+.next/
+dist/
+
+# 환경 변수 (민감한 정보 - 절대 업로드 금지!)
+.env
+.env.local
+.env*.local
+frontend/.env.local
+contracts/.env
+contracts/.env.save
+
+# 개인키 (절대 업로드 금지!)
+**/private-key.txt
+**/*private*.txt
