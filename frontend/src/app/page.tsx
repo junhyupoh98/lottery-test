@@ -137,6 +137,10 @@ export default function Home() {
   const [drawStatus, setDrawStatus] = useState<'selling' | 'closed' | 'drawn'>('selling');
   const [hasWinningNumbers, setHasWinningNumbers] = useState(false);
   const [prizeDistributions, setPrizeDistributions] = useState<any[]>([]);
+  
+  // 테스트용 당첨번호 설정
+  const [testDrawId, setTestDrawId] = useState(0);
+  const [testNumbers, setTestNumbers] = useState<number[]>([0, 0, 0, 0, 0, 0]);
   const [accumulatedJackpot, setAccumulatedJackpot] = useState('0');
   const [collectedFees, setCollectedFees] = useState('0');
   const [latestRequestId, setLatestRequestId] = useState<number | null>(null);
@@ -760,6 +764,90 @@ export default function Home() {
       }
       
       alert(`❌ ${errorMessage}\n\n상세:\n${error.message || error}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 관리자: 테스트용 당첨번호 설정
+  const setTestWinningNumbers = async () => {
+    if (!provider || !isOwner) {
+      alert('❌ 오류: 관리자 권한이 필요합니다!');
+      return;
+    }
+    
+    if (!testDrawId || testDrawId <= 0) {
+      alert('❌ 회차 번호를 입력해주세요!');
+      return;
+    }
+    
+    // 번호 유효성 검증
+    const validNumbers = testNumbers.filter(n => n >= 1 && n <= 45);
+    if (validNumbers.length !== 6) {
+      alert('❌ 1~45 사이의 번호 6개를 모두 입력해주세요!');
+      return;
+    }
+    
+    // 중복 검사
+    const uniqueNumbers = new Set(testNumbers);
+    if (uniqueNumbers.size !== 6) {
+      alert('❌ 중복된 번호가 있습니다!');
+      return;
+    }
+    
+    try {
+      setIsLoading(true);
+      console.log('🎯 테스트용 당첨번호 설정 시작...');
+      console.log('- 회차:', testDrawId);
+      console.log('- 번호:', testNumbers);
+      
+      const browserProvider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await browserProvider.getSigner();
+      
+      const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '0x2e7bb733b7813628a46130fa48b9f9cdda29e088';
+      const contractWithSigner = new ethers.Contract(contractAddress, lottoAbi, signer);
+      
+      console.log('📤 setWinningNumbersForTest 호출 중...');
+      const tx = await contractWithSigner.setWinningNumbersForTest(testDrawId, testNumbers, {
+        gasLimit: 500000
+      });
+      
+      console.log('✅ 트랜잭션 전송 완료:', tx.hash);
+      alert(`테스트용 당첨번호 설정 트랜잭션 전송됨!\n\nTx Hash: ${tx.hash}\n\n당첨금 분배 중...`);
+      
+      await tx.wait();
+      console.log('✅ 트랜잭션 확정됨');
+      
+      alert(`✅ 당첨번호 설정 완료! 🎉\n\n회차: ${testDrawId}\n번호: ${testNumbers.join(', ')}\n\n당첨금이 자동으로 분배되었습니다!`);
+      
+      // 컨트랙트 데이터 새로고침
+      if (contract) {
+        loadContractData(contract);
+        loadPrizeDistributions();
+      }
+      
+      // 입력 초기화
+      setTestDrawId(0);
+      setTestNumbers([0, 0, 0, 0, 0, 0]);
+      
+    } catch (error: any) {
+      console.error('❌ 테스트용 당첨번호 설정 실패:', error);
+      
+      let errorMessage = '테스트용 당첨번호 설정 실패';
+      
+      if (error.code === 'ACTION_REJECTED') {
+        errorMessage = '사용자가 트랜잭션을 거부했습니다.';
+      } else if (error.message?.includes('insufficient funds')) {
+        errorMessage = '가스비가 부족합니다. KAIA를 충전해주세요.';
+      } else if (error.message?.includes('Cannot set for current/future draw')) {
+        errorMessage = '현재 또는 미래 회차에는 설정할 수 없습니다. 종료된 회차만 가능합니다.';
+      } else if (error.message?.includes('Winning numbers already set')) {
+        errorMessage = '이미 당첨번호가 설정된 회차입니다.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      alert(`❌ 오류 발생\n\n${errorMessage}`);
     } finally {
       setIsLoading(false);
     }
@@ -1649,6 +1737,63 @@ export default function Home() {
                         {isLoading ? '⏳ 처리 중...' : '🎲 당첨 번호 생성'}
                       </button>
                     </div>
+                  </div>
+                </div>
+
+                {/* 테스트용 당첨번호 직접 설정 */}
+                <div className="p-6 bg-white/10 rounded-xl">
+                  <h4 className="text-xl font-semibold mb-4">🎯 테스트용 당첨번호 직접 설정</h4>
+                  <p className="text-sm text-white/70 mb-4">
+                    터미널 없이 편하게 테스트용 당첨번호를 설정할 수 있습니다.
+                  </p>
+                  
+                  <div className="space-y-4">
+                    {/* 회차 선택 */}
+                    <div>
+                      <label className="block text-sm text-white/70 mb-2">회차 번호</label>
+                      <input
+                        type="number"
+                        value={testDrawId || ''}
+                        onChange={(e) => setTestDrawId(Number(e.target.value))}
+                        className="w-full px-4 py-2 bg-white/20 rounded-lg text-white placeholder-white/50"
+                        placeholder="회차 번호 입력 (예: 5)"
+                      />
+                    </div>
+                    
+                    {/* 6개 번호 입력 */}
+                    <div>
+                      <label className="block text-sm text-white/70 mb-2">당첨 번호 (1~45)</label>
+                      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                        {[0, 1, 2, 3, 4, 5].map((index) => (
+                          <input
+                            key={index}
+                            type="number"
+                            min="1"
+                            max="45"
+                            value={testNumbers[index] || ''}
+                            onChange={(e) => {
+                              const newNumbers = [...testNumbers];
+                              newNumbers[index] = Number(e.target.value);
+                              setTestNumbers(newNumbers);
+                            }}
+                            className="w-full px-3 py-2 bg-white/20 rounded-lg text-white text-center placeholder-white/50"
+                            placeholder={`#${index + 1}`}
+                          />
+                        ))}
+                      </div>
+                      <p className="text-xs text-yellow-300 mt-2">
+                        💡 팁: 1~45 사이의 중복되지 않는 번호 6개를 입력하세요
+                      </p>
+                    </div>
+                    
+                    {/* 설정 버튼 */}
+                    <button
+                      onClick={setTestWinningNumbers}
+                      disabled={!testDrawId || isLoading}
+                      className="w-full bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 disabled:from-gray-600 disabled:to-gray-700 text-white px-6 py-3 rounded-lg font-semibold transition-all transform hover:scale-105"
+                    >
+                      {isLoading ? '⏳ 처리 중...' : '🎯 당첨번호 설정 및 당첨금 분배'}
+                    </button>
                   </div>
                 </div>
               </div>
