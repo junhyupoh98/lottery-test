@@ -458,7 +458,7 @@ export default function Home() {
             let isWinner = false;
             let matchCount = 0;
             try {
-              const winningNums = [];
+              const winningNums: number[] = [];
               for (let i = 0; i < 6; i++) {
                 const num = await contract.winningNumbers(drawId, i);
                 winningNums.push(Number(num));
