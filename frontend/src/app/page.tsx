@@ -324,7 +324,7 @@ export default function Home() {
       const events = await contract.queryFilter(filter, fromBlock, 'latest');
       console.log('📋 발견된 VRF 요청 이벤트 수:', events.length);
       
-      const requests = [];
+      const requests: any[] = [];
       
       for (const event of events) {
         const requestId = event.args?.requestId;
@@ -375,7 +375,7 @@ export default function Home() {
       const events = await contract.queryFilter(filter, fromBlock, 'latest');
       console.log('📋 발견된 분배 이벤트 수:', events.length);
       
-      const distributions = [];
+      const distributions: any[] = [];
       
       for (const event of events) {
         const drawId = event.args?.drawId;
@@ -439,7 +439,7 @@ export default function Home() {
       const events = await contract.queryFilter(filter, fromBlock, 'latest');
       console.log('📋 발견된 이벤트 수:', events.length);
       
-      const tickets = [];
+      const tickets: any[] = [];
       
       for (const event of events) {
         const tokenId = event.args?.ticketId;
@@ -579,7 +579,7 @@ export default function Home() {
 
   // 자동 선택 (랜덤)
   const autoSelect = () => {
-    const numbers = [];
+    const numbers: number[] = [];
     while (numbers.length < 6) {
       const random = Math.floor(Math.random() * 45) + 1;
       if (!numbers.includes(random)) {
@@ -599,7 +599,7 @@ export default function Home() {
     if (!contract) return;
     
     try {
-      const numbers = [];
+      const numbers: number[] = [];
       for (let i = 0; i < 6; i++) {
         const num = await contract.winningNumbers(drawId, i);
         numbers.push(Number(num));
