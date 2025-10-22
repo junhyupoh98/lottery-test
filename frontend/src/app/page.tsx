@@ -632,6 +632,12 @@ export default function Home() {
       console.log('- 현재 회차:', currentDrawId);
       console.log('- 다음 회차:', currentDrawId + 1);
       
+      // 모달 표시: 트랜잭션 전송 중
+      setTxModalStatus('pending');
+      setTxModalMessage('회차 종료 트랜잭션을 전송하고 있습니다...');
+      setTxHash('');
+      setTxModalOpen(true);
+      
       // MetaMask의 BrowserProvider를 사용하여 서명자 가져오기
       const browserProvider = new ethers.BrowserProvider(window.ethereum);
       const signer = await browserProvider.getSigner();
@@ -652,40 +658,66 @@ export default function Home() {
         gasLimit: 200000
       });
       console.log('✅ 트랜잭션 전송 완료:', tx.hash);
-      alert(`추첨 생성 트랜잭션 전송됨!\n\nTx Hash: ${tx.hash}\n\n확인 대기 중...`);
+      
+      // 모달 업데이트: 확인 대기 중
+      setTxModalMessage('다음 회차 생성 중...\n트랜잭션 확인 대기 중...');
+      setTxHash(tx.hash);
+      
       await tx.wait();
       console.log('✅ 추첨 생성 완료');
       
       console.log('📤 현재 회차 변경 중...');
+      // 모달 업데이트
+      setTxModalMessage('현재 회차 변경 중...');
+      
       // 다음 추첨을 현재 추첨으로 설정
       const tx2 = await contractWithSigner.setCurrentDraw(nextDrawId, {
         gasLimit: 100000
       });
       console.log('✅ 트랜잭션 전송 완료:', tx2.hash);
+      setTxHash(tx2.hash);
+      
       await tx2.wait();
       console.log('✅ 현재 회차 변경 완료');
       
-      alert(`✅ 성공!\n\n추첨 #${currentDrawId} 종료됨\n추첨 #${nextDrawId} 시작됨!`);
+      // 모달 업데이트: 성공
+      setTxModalStatus('success');
+      setTxModalMessage(`회차 종료 완료! 🎉\n\n추첨 #${currentDrawId} → 추첨 #${nextDrawId}\n\n새로운 회차가 시작되었습니다!`);
+      
+      // 3초 후 모달 닫기
+      setTimeout(() => {
+        setTxModalOpen(false);
+      }, 3000);
+      
       loadContractData(contract);
       setDrawStatus('closed');
     } catch (error: any) {
       console.error('❌ 회차 종료 실패:', error);
       
-      let errorMessage = '회차 종료 실패';
+      let errorMessage = '회차 종료에 실패했습니다';
+      let errorDetail = '';
       
       if (error.code === 'ACTION_REJECTED') {
-        errorMessage = '사용자가 트랜잭션을 거부했습니다.';
+        errorMessage = '트랜잭션이 거부되었습니다';
+        errorDetail = 'MetaMask에서 트랜잭션을 취소했습니다.';
       } else if (error.message?.includes('insufficient funds')) {
-        errorMessage = '가스비가 부족합니다. KAIA를 충전해주세요.';
+        errorMessage = '가스비가 부족합니다';
+        errorDetail = 'KAIA를 충전해주세요.';
       } else if (error.message?.includes('Ownable')) {
-        errorMessage = 'Owner 권한이 필요합니다.';
+        errorMessage = 'Owner 권한이 필요합니다';
+        errorDetail = '관리자 계정으로 연결해주세요.';
       } else if (error.reason) {
-        errorMessage = error.reason;
+        errorMessage = '컨트랙트 에러';
+        errorDetail = error.reason;
       } else if (error.message) {
-        errorMessage = error.message;
+        errorMessage = '알 수 없는 오류';
+        errorDetail = error.message.slice(0, 200);
       }
       
-      alert(`❌ ${errorMessage}\n\n상세:\n${error.message || error}`);
+      // 모달 업데이트: 에러
+      setTxModalStatus('error');
+      setTxModalMessage(`${errorMessage}\n\n${errorDetail}`);
+      setTxModalOpen(true);
     } finally {
       setIsLoading(false);
     }
@@ -709,6 +741,12 @@ export default function Home() {
       console.log('- 회차:', newDrawId);
       console.log('- 날짜:', newDrawTimestamp);
       
+      // 모달 표시: 트랜잭션 전송 중
+      setTxModalStatus('pending');
+      setTxModalMessage('추첨 생성 트랜잭션을 전송하고 있습니다...');
+      setTxHash('');
+      setTxModalOpen(true);
+      
       // MetaMask의 BrowserProvider를 사용하여 서명자 가져오기
       const browserProvider = new ethers.BrowserProvider(window.ethereum);
       const signer = await browserProvider.getSigner();
@@ -727,20 +765,37 @@ export default function Home() {
       });
       
       console.log('✅ 트랜잭션 전송 완료:', tx.hash);
-      alert(`추첨 생성 트랜잭션 전송됨!\n\nTx Hash: ${tx.hash}\n\n확인 대기 중...`);
+      
+      // 모달 업데이트: 확인 대기 중
+      setTxModalMessage('추첨 생성 중...\n트랜잭션 확인 대기 중...');
+      setTxHash(tx.hash);
+      
       await tx.wait();
       console.log('✅ 추첨 생성 완료');
       
       console.log('📤 현재 회차로 설정 중...');
+      // 모달 업데이트
+      setTxModalMessage('현재 회차로 설정 중...');
+      
       // 현재 추첨으로 설정
       const tx2 = await contractWithSigner.setCurrentDraw(newDrawId, {
         gasLimit: 100000
       });
       console.log('✅ 트랜잭션 전송 완료:', tx2.hash);
+      setTxHash(tx2.hash);
+      
       await tx2.wait();
       console.log('✅ 현재 회차 설정 완료');
       
-      alert(`✅ 추첨이 생성되고 활성화되었습니다! 🎉\n\n회차 #${newDrawId} 시작!`);
+      // 모달 업데이트: 성공
+      setTxModalStatus('success');
+      setTxModalMessage(`추첨이 생성되고 활성화되었습니다! 🎉\n\n회차 #${newDrawId} 시작!`);
+      
+      // 3초 후 모달 닫기
+      setTimeout(() => {
+        setTxModalOpen(false);
+      }, 3000);
+      
       loadContractData(contract);
       
       // 입력값 초기화
@@ -749,21 +804,30 @@ export default function Home() {
     } catch (error: any) {
       console.error('❌ 추첨 생성 실패:', error);
       
-      let errorMessage = '추첨 생성 실패';
+      let errorMessage = '추첨 생성에 실패했습니다';
+      let errorDetail = '';
       
       if (error.code === 'ACTION_REJECTED') {
-        errorMessage = '사용자가 트랜잭션을 거부했습니다.';
+        errorMessage = '트랜잭션이 거부되었습니다';
+        errorDetail = 'MetaMask에서 트랜잭션을 취소했습니다.';
       } else if (error.message?.includes('insufficient funds')) {
-        errorMessage = '가스비가 부족합니다. KAIA를 충전해주세요.';
+        errorMessage = '가스비가 부족합니다';
+        errorDetail = 'KAIA를 충전해주세요.';
       } else if (error.message?.includes('Ownable')) {
-        errorMessage = 'Owner 권한이 필요합니다.';
+        errorMessage = 'Owner 권한이 필요합니다';
+        errorDetail = '관리자 계정으로 연결해주세요.';
       } else if (error.reason) {
-        errorMessage = error.reason;
+        errorMessage = '컨트랙트 에러';
+        errorDetail = error.reason;
       } else if (error.message) {
-        errorMessage = error.message;
+        errorMessage = '알 수 없는 오류';
+        errorDetail = error.message.slice(0, 200);
       }
       
-      alert(`❌ ${errorMessage}\n\n상세:\n${error.message || error}`);
+      // 모달 업데이트: 에러
+      setTxModalStatus('error');
+      setTxModalMessage(`${errorMessage}\n\n${errorDetail}`);
+      setTxModalOpen(true);
     } finally {
       setIsLoading(false);
     }
@@ -870,6 +934,12 @@ export default function Home() {
       console.log('🎲 Mock VRF fulfillRequest 시작...');
       console.log('- Request ID:', requestId);
       
+      // 모달 표시: 트랜잭션 전송 중
+      setTxModalStatus('pending');
+      setTxModalMessage('Mock VRF 트랜잭션을 전송하고 있습니다...');
+      setTxHash('');
+      setTxModalOpen(true);
+      
       const browserProvider = new ethers.BrowserProvider(window.ethereum);
       const signer = await browserProvider.getSigner();
       
@@ -883,12 +953,22 @@ export default function Home() {
       });
       
       console.log('✅ 트랜잭션 전송 완료:', tx.hash);
-      alert(`Mock VRF fulfillRequest 전송됨!\n\nTx Hash: ${tx.hash}\n\n당첨 번호 생성 중...`);
+      
+      // 모달 업데이트: 확인 대기 중
+      setTxModalMessage('Mock VRF 실행 중...\n당첨 번호 생성 중...');
+      setTxHash(tx.hash);
       
       await tx.wait();
       console.log('✅ 트랜잭션 확정됨');
       
-      alert('✅ 당첨 번호가 생성되었습니다! 🎉\n\n"당첨 번호 확인"에서 결과를 확인하세요!');
+      // 모달 업데이트: 성공
+      setTxModalStatus('success');
+      setTxModalMessage(`당첨 번호가 생성되었습니다! 🎉\n\nRequest ID: ${requestId}\n\n"당첨 번호 확인"에서 결과를 확인하세요!`);
+      
+      // 3초 후 모달 닫기
+      setTimeout(() => {
+        setTxModalOpen(false);
+      }, 3000);
       
       // 컨트랙트 데이터 새로고침
       if (contract) {
@@ -898,21 +978,30 @@ export default function Home() {
     } catch (error: any) {
       console.error('❌ Mock VRF fulfillRequest 실패:', error);
       
-      let errorMessage = 'Mock VRF fulfillRequest 실패';
+      let errorMessage = 'Mock VRF 실행에 실패했습니다';
+      let errorDetail = '';
       
       if (error.code === 'ACTION_REJECTED') {
-        errorMessage = '사용자가 트랜잭션을 거부했습니다.';
+        errorMessage = '트랜잭션이 거부되었습니다';
+        errorDetail = 'MetaMask에서 트랜잭션을 취소했습니다.';
       } else if (error.message?.includes('insufficient funds')) {
-        errorMessage = '가스비가 부족합니다. KAIA를 충전해주세요.';
+        errorMessage = '가스비가 부족합니다';
+        errorDetail = 'KAIA를 충전해주세요.';
       } else if (error.message?.includes('invalid requestId')) {
-        errorMessage = '유효하지 않은 Request ID입니다.';
+        errorMessage = '유효하지 않은 Request ID입니다';
+        errorDetail = 'VRF 요청을 먼저 실행해주세요.';
       } else if (error.reason) {
-        errorMessage = error.reason;
+        errorMessage = '컨트랙트 에러';
+        errorDetail = error.reason;
       } else if (error.message) {
-        errorMessage = error.message;
+        errorMessage = '알 수 없는 오류';
+        errorDetail = error.message.slice(0, 200);
       }
       
-      alert(`❌ ${errorMessage}\n\n상세:\n${error.message || error}`);
+      // 모달 업데이트: 에러
+      setTxModalStatus('error');
+      setTxModalMessage(`${errorMessage}\n\n${errorDetail}`);
+      setTxModalOpen(true);
     } finally {
       setIsLoading(false);
     }
@@ -964,18 +1053,34 @@ export default function Home() {
         console.log('당첨 번호 확인 중 오류 (정상):', e);
       }
       
+      // 모달 표시: 트랜잭션 전송 중
+      setTxModalStatus('pending');
+      setTxModalMessage('VRF 요청 트랜잭션을 전송하고 있습니다...');
+      setTxHash('');
+      setTxModalOpen(true);
+      
       console.log('📤 트랜잭션 전송 중...');
       const tx = await contractWithSigner.requestRandomWinningNumbers(drawId, {
         gasLimit: 500000 // 가스 리밋 명시적으로 설정
       });
       
       console.log('✅ 트랜잭션 전송 완료:', tx.hash);
-      alert(`VRF 요청 전송됨!\n\nTx Hash: ${tx.hash}\n\nOrakl VRF가 당첨 번호를 생성합니다.\n(수 분 소요될 수 있습니다)`);
+      
+      // 모달 업데이트: 확인 대기 중
+      setTxModalMessage('VRF 요청 전송 완료!\n트랜잭션 확인 대기 중...');
+      setTxHash(tx.hash);
       
       await tx.wait();
       console.log('✅ 트랜잭션 확정됨');
       
-      alert('✅ VRF 요청이 완료되었습니다!\n\n잠시 후 당첨 번호가 생성됩니다.\n(새로고침하여 결과를 확인하세요)');
+      // 모달 업데이트: 성공
+      setTxModalStatus('success');
+      setTxModalMessage(`VRF 요청이 완료되었습니다! 🎲\n\n회차 #${drawId}\n\nOrakl VRF가 당첨 번호를 생성합니다.\n(수 분 소요될 수 있습니다)`);
+      
+      // 5초 후 모달 닫기
+      setTimeout(() => {
+        setTxModalOpen(false);
+      }, 5000);
       
       // 컨트랙트 데이터 새로고침
       loadContractData(contract);
@@ -986,26 +1091,36 @@ export default function Home() {
     } catch (error: any) {
       console.error('❌ VRF 요청 실패:', error);
       
-      // 에러 타입별 상세 메시지
-      let errorMessage = 'VRF 요청 실패';
+      let errorMessage = 'VRF 요청에 실패했습니다';
+      let errorDetail = '';
       
       if (error.code === 'ACTION_REJECTED') {
-        errorMessage = '사용자가 트랜잭션을 거부했습니다.';
+        errorMessage = '트랜잭션이 거부되었습니다';
+        errorDetail = 'MetaMask에서 트랜잭션을 취소했습니다.';
       } else if (error.message?.includes('insufficient funds')) {
-        errorMessage = '가스비가 부족합니다. KAIA를 충전해주세요.';
+        errorMessage = '가스비가 부족합니다';
+        errorDetail = 'KAIA를 충전해주세요.';
       } else if (error.message?.includes('Ownable')) {
-        errorMessage = 'Owner 권한이 필요합니다.';
+        errorMessage = 'Owner 권한이 필요합니다';
+        errorDetail = '관리자 계정으로 연결해주세요.';
       } else if (error.message?.includes('Cannot draw current')) {
-        errorMessage = `현재 회차(#${currentDrawId})보다 이전 회차만 추첨할 수 있습니다.`;
+        errorMessage = '현재 회차는 추첨할 수 없습니다';
+        errorDetail = `현재 회차(#${currentDrawId})보다 이전 회차만 추첨할 수 있습니다.`;
       } else if (error.message?.includes('already set')) {
-        errorMessage = '이미 추첨된 회차입니다.';
+        errorMessage = '이미 추첨된 회차입니다';
+        errorDetail = '당첨 번호가 이미 생성되었습니다.';
       } else if (error.reason) {
-        errorMessage = error.reason;
+        errorMessage = '컨트랙트 에러';
+        errorDetail = error.reason;
       } else if (error.message) {
-        errorMessage = error.message;
+        errorMessage = '알 수 없는 오류';
+        errorDetail = error.message.slice(0, 200);
       }
       
-      alert(`❌ ${errorMessage}\n\n상세:\n${error.message || error}`);
+      // 모달 업데이트: 에러
+      setTxModalStatus('error');
+      setTxModalMessage(`${errorMessage}\n\n${errorDetail}`);
+      setTxModalOpen(true);
     } finally {
       setIsLoading(false);
     }
