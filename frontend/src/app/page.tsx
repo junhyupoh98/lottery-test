@@ -151,6 +151,14 @@ export default function Home() {
   const [txModalStatus, setTxModalStatus] = useState<'pending' | 'success' | 'error'>('pending');
   const [txModalMessage, setTxModalMessage] = useState('');
   const [txHash, setTxHash] = useState('');
+  
+  // 필터 상태
+  const [ticketDrawFilter, setTicketDrawFilter] = useState<number | 'all'>('all');
+  const [prizeDrawFilter, setPrizeDrawFilter] = useState<number | 'all'>('all');
+  
+  // 현재 회차 판매 현황
+  const [currentDrawTicketCount, setCurrentDrawTicketCount] = useState(0);
+  const [currentDrawTotalSales, setCurrentDrawTotalSales] = useState('0');
 
   // 컨트랙트 초기화
   useEffect(() => {
@@ -192,6 +200,7 @@ export default function Home() {
           setTimeout(() => {
             loadPrizeDistributions();
             loadVrfRequestHistory();
+            loadCurrentDrawTicketCount();
           }, 500);
         } catch (error) {
           console.error('❌ 컨트랙트 연결 실패:', error);
@@ -354,6 +363,37 @@ export default function Home() {
     } catch (error) {
       console.error('❌ VRF 요청 이력 로드 실패:', error);
       setVrfRequestHistory([]);
+    }
+  };
+
+  // 현재 회차 판매 현황 가져오기
+  const loadCurrentDrawTicketCount = async () => {
+    if (!contract || !provider || !currentDrawId) {
+      console.log('⚠️ 현재 회차 판매 현황 로드 조건 미충족');
+      return;
+    }
+    
+    try {
+      console.log('📊 현재 회차 판매 현황 조회 시작...');
+      
+      const currentBlock = await provider.getBlockNumber();
+      const fromBlock = currentBlock ? Math.max(0, currentBlock - 100000) : 0;
+      
+      // 현재 회차의 TicketPurchased 이벤트 필터
+      const filter = contract.filters.TicketPurchased(null, currentDrawId);
+      const events = await contract.queryFilter(filter, fromBlock, 'latest');
+      
+      const ticketCount = events.length;
+      const totalSales = (ticketCount * parseFloat(ticketPrice)).toFixed(4);
+      
+      setCurrentDrawTicketCount(ticketCount);
+      setCurrentDrawTotalSales(totalSales);
+      
+      console.log(`✅ 현재 회차 #${currentDrawId} 판매: ${ticketCount}장, ${totalSales} ETH`);
+    } catch (error) {
+      console.error('❌ 현재 회차 판매 현황 로드 실패:', error);
+      setCurrentDrawTicketCount(0);
+      setCurrentDrawTotalSales('0');
     }
   };
 
@@ -551,6 +591,7 @@ export default function Home() {
           await loadMyTickets();
           await loadPrizeDistributions();
           await loadVrfRequestHistory();
+          await loadCurrentDrawTicketCount();
         }
         
         console.log('✅ 지갑 연결 성공:', accounts[0]);
@@ -1216,6 +1257,7 @@ export default function Home() {
       await loadContractData(contract);
       await loadMyTickets();
       await loadPrizeDistributions();
+      await loadCurrentDrawTicketCount();
       setSelectedNumbers([]);
       
     } catch (error: any) {
@@ -1255,6 +1297,27 @@ export default function Home() {
       setIsLoading(false);
     }
   };
+
+  // 필터링된 티켓과 상금 분배
+  const filteredTickets = ticketDrawFilter === 'all' 
+    ? myTickets 
+    : myTickets.filter(t => t.drawId === ticketDrawFilter);
+  
+  const filteredPrizes = prizeDrawFilter === 'all'
+    ? prizeDistributions
+    : prizeDistributions.filter(p => p.drawId === prizeDrawFilter);
+  
+  // 회차별 티켓 개수 계산
+  const ticketCountByDraw = myTickets.reduce((acc, ticket) => {
+    acc[ticket.drawId] = (acc[ticket.drawId] || 0) + 1;
+    return acc;
+  }, {} as Record<number, number>);
+  
+  // 고유한 회차 목록 (내 티켓 기준)
+  const uniqueDrawIds = [...new Set(myTickets.map(t => t.drawId))].sort((a, b) => b - a);
+  
+  // 상금 분배가 있는 회차 목록
+  const prizeDrawIds = [...new Set(prizeDistributions.map(p => p.drawId))].sort((a, b) => b - a);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
@@ -1373,15 +1436,42 @@ export default function Home() {
             {/* 3. 내가 산 티켓 표시 */}
             {address && (
               <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 mb-6 text-white">
-                <h3 className="text-xl font-bold mb-4">🎫 내 티켓 ({myTickets.length}장)</h3>
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+                  <h3 className="text-xl font-bold">🎫 내 티켓 ({myTickets.length}장)</h3>
+                  
+                  {/* 회차 필터 드롭다운 */}
+                  {myTickets.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm text-white/70">회차:</label>
+                      <select
+                        value={ticketDrawFilter}
+                        onChange={(e) => setTicketDrawFilter(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+                        className="bg-white/20 border border-white/30 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="all" className="bg-gray-800">전체 ({myTickets.length}장)</option>
+                        {uniqueDrawIds.map(drawId => (
+                          <option key={drawId} value={drawId} className="bg-gray-800">
+                            회차 #{drawId} ({ticketCountByDraw[drawId]}장) {drawId === currentDrawId && '⭐'}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+                
                 {myTickets.length === 0 ? (
                   <div className="text-center py-8 text-gray-400">
                     <p className="text-lg">아직 구매한 티켓이 없습니다</p>
                     <p className="text-sm mt-2">위에서 번호를 선택하고 티켓을 구매해보세요! 🎰</p>
                   </div>
+                ) : filteredTickets.length === 0 ? (
+                  <div className="text-center py-8 text-gray-400">
+                    <p className="text-lg">이 회차에는 티켓이 없습니다</p>
+                    <p className="text-sm mt-2">다른 회차를 선택해보세요</p>
+                  </div>
                 ) : (
                   <div className="space-y-4 max-h-96 overflow-y-auto">
-                    {myTickets.map((ticket) => (
+                    {filteredTickets.map((ticket) => (
                       <div key={ticket.tokenId} className={`rounded-xl p-4 border-2 ${
                         ticket.matchCount === 6 ? 'bg-gradient-to-r from-yellow-500/30 to-orange-500/30 border-yellow-400 animate-pulse' : 
                         ticket.matchCount === 5 ? 'bg-gradient-to-r from-blue-500/30 to-cyan-500/30 border-blue-400' :
@@ -1448,15 +1538,42 @@ export default function Home() {
 
             {/* 상금 분배 내역 */}
             <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 mb-6 text-white">
-              <h3 className="text-xl font-bold mb-4">💰 상금 분배 내역</h3>
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+                <h3 className="text-xl font-bold">💰 상금 분배 내역</h3>
+                
+                {/* 회차 필터 드롭다운 */}
+                {prizeDistributions.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm text-white/70">회차:</label>
+                    <select
+                      value={prizeDrawFilter}
+                      onChange={(e) => setPrizeDrawFilter(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+                      className="bg-white/20 border border-white/30 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    >
+                      <option value="all" className="bg-gray-800">전체 ({prizeDistributions.length}건)</option>
+                      {prizeDrawIds.map(drawId => (
+                        <option key={drawId} value={drawId} className="bg-gray-800">
+                          회차 #{drawId}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+              
               {prizeDistributions.length === 0 ? (
                 <div className="text-center py-8 text-gray-400">
                   <p className="text-lg">아직 상금이 분배된 회차가 없습니다</p>
                   <p className="text-sm mt-2">당첨자가 발생하면 여기에 표시됩니다! 💸</p>
                 </div>
+              ) : filteredPrizes.length === 0 ? (
+                <div className="text-center py-8 text-gray-400">
+                  <p className="text-lg">이 회차에는 상금 분배 내역이 없습니다</p>
+                  <p className="text-sm mt-2">다른 회차를 선택해보세요</p>
+                </div>
               ) : (
                 <div className="space-y-4 max-h-96 overflow-y-auto">
-                  {prizeDistributions.map((dist) => (
+                  {filteredPrizes.map((dist) => (
                     <div key={dist.drawId} className={`rounded-xl p-4 border ${parseFloat(dist.rolloverAmount) > 0 ? 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 border-purple-400/30' : 'bg-gradient-to-r from-green-500/20 to-emerald-500/20 border-green-400/30'}`}>
                       <div className="flex justify-between items-center mb-3">
                         <span className="text-lg font-bold text-green-300">회차 #{dist.drawId}</span>
@@ -1542,6 +1659,31 @@ export default function Home() {
                   <p className="text-xs text-gray-400 mt-1">(수수료 20% 포함)</p>
                 </div>
               </div>
+              
+              {/* 판매 현황 추가 */}
+              <div className="mt-6 p-4 bg-gradient-to-r from-blue-500/20 to-cyan-500/20 border border-blue-400/50 rounded-xl">
+                <h4 className="text-center text-lg font-semibold mb-3">📊 이번 회차 판매 현황</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
+                  <div>
+                    <p className="text-sm text-blue-200 mb-1">판매된 티켓</p>
+                    <p className="text-2xl font-bold text-blue-300">{currentDrawTicketCount}장 🔥</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-cyan-200 mb-1">참여자 수</p>
+                    <p className="text-2xl font-bold text-cyan-300">약 {currentDrawTicketCount}명</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-blue-200 mb-1">총 판매액</p>
+                    <p className="text-2xl font-bold text-blue-300">{currentDrawTotalSales} ETH</p>
+                  </div>
+                </div>
+                {currentDrawTicketCount > 0 && (
+                  <p className="text-center text-xs text-blue-300 mt-3">
+                    💡 많은 분들이 참여하고 있습니다! 지금 참여해보세요!
+                  </p>
+                )}
+              </div>
+              
               {parseFloat(accumulatedJackpot) > 0 && (
                 <div className="mt-4 p-3 bg-purple-500/20 border border-purple-400 rounded-lg text-center">
                   <p className="text-sm font-semibold text-purple-300">
