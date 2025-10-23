@@ -17,3 +17,8 @@ contracts/.env.save
 # 개인키 (절대 업로드 금지!)
 **/private-key.txt
 **/*private*.txt
+
+# 백업 폴더
+frontend-original-backup/
+frontend/temp-repo/
+frontend/frontend/
